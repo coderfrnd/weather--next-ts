@@ -1,6 +1,13 @@
   import { findWeatherCity } from "@/app/api/findWeatherCity";
-
-  export default async function City({ params }: { params: { id: string } }) {
+  interface PageProps {
+    params: { id: string };
+  }
+  export async function generateMetadata({ params }: PageProps) {
+    return {
+      title: `Weather in ${params.id}`,
+    };
+  }
+  export default async function City({ params }: PageProps) {
     const cityId =  params.id;
     const weather = await findWeatherCity(cityId);
     
