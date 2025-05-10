@@ -1,22 +1,31 @@
 "use client";
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getAllCity, getCityByName } from "../api/getAllCity";
-import Link from "next/link";
 
-export default function Home() {
+interface CityData {
+  geoname_id: string;
+  name: string;
+  ascii_name: string;
+  cou_name_en: string;
+  country_code: string;
+  population: number;
+  coordinates: {
+    lat: number;
+    lon: number;
+  };
+  timezone: string;
+}
+
+function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialSearch = searchParams.get("q") || "";
   const [city, setCity] = useState(initialSearch);
-  const [weather, setWeather] = useState<any[]>([]);
-  const [page, setPage] = useState(1);
+  const [weather, setWeather] = useState<CityData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [isSearching, setIsSearching] = useState(false);
-  const observer = useRef<IntersectionObserver | null>(null);
   const limit = 10;
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<CityData[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Update URL when city changes
@@ -26,14 +35,11 @@ export default function Home() {
     } else {
       router.replace(`/home`);
     }
-  }, [city]);
+  }, [city, router]);
 
   // Fetch initial data or search results on mount and when city changes
   useEffect(() => {
     if (!city.trim()) {
-      setIsSearching(false);
-      setPage(1);
-      setHasMore(true);
       setLoading(true);
       getAllCity({ limit, start: 0 })
         .then((data) => {
@@ -43,12 +49,10 @@ export default function Home() {
         .catch(() => setLoading(false));
       return;
     }
-    setIsSearching(true);
     setLoading(true);
     getCityByName({ name: city.trim() })
       .then((data) => {
         setWeather(data.results || []);
-        setHasMore(false);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -66,7 +70,7 @@ export default function Home() {
         const data = await getCityByName({ name: city.trim() });
         setSuggestions(data.results || []);
         setShowSuggestions(true);
-      } catch (error) {
+      } catch {
         setSuggestions([]);
         setShowSuggestions(false);
       }
@@ -87,7 +91,7 @@ export default function Home() {
     );
   }
 
-  function TdUi({ item }: { item: any }) {
+  function TdUi({ item }: { item: CityData }) {
     const columns = [
       {
         render: () => (
@@ -131,12 +135,7 @@ export default function Home() {
             key={index}
             className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
           >
-            <Link
-              href={`/home/${item.name.toLowerCase()}`}
-              className="block hover:bg-gray-100"
-            >
-              {column.render()}
-            </Link>
+            {column.render()}
           </td>
         ))}
       </>
@@ -163,9 +162,9 @@ export default function Home() {
         </button>
         {showSuggestions && suggestions.length > 0 && (
           <ul className="absolute z-10 bg-white border w-full max-w-md mt-12 rounded shadow-lg max-h-60 overflow-y-auto">
-            {suggestions.map((item, idx) => (
+            {suggestions.map((item) => (
               <li
-                key={item.geoname_id || idx}
+                key={item.geoname_id}
                 className="px-4 py-2 hover:bg-blue-100 cursor-pointer"
                 onMouseDown={() => {
                   setCity(item.name);
@@ -196,10 +195,11 @@ export default function Home() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 cursor-pointer">
-            {weather?.map((item: any, index: number) => (
+            {weather?.map((item) => (
               <tr
-                key={`${item.geoname_id}-${index}`}
+                key={item.geoname_id}
                 className="hover:bg-gray-50"
+                onClick={() => router.push(`/weather/${item.name}`)}
               >
                 <TdUi item={item} />
               </tr>
@@ -215,5 +215,17 @@ export default function Home() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
   );
 }
